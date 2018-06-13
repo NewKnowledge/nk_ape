@@ -126,7 +126,7 @@ class ConceptDescriptor:
         indexed_scores = sorted(
             indexed_scores, key=itemgetter(0), reverse=True)
         top_n = indexed_scores[0:n]
-        top_words = [self.tree.classes[index] for (score, index) in top_n]
+        top_words = [{'concept': self.tree.classes[index], 'conf': score} for (score, index) in top_n]
 
         return top_words
 
