@@ -4,9 +4,9 @@ import numpy as np
 from operator import itemgetter
 from inflection import pluralize
 
-from class_tree import EmbeddedClassTree, tree_score
-from embedding import Embedding
-from utils import (get_dropped, mean_of_rows, no_op, normalize_text,
+from nk_ape.class_tree import EmbeddedClassTree, tree_score
+from nk_ape.embedding import Embedding
+from nk_ape.utils import (get_dropped, mean_of_rows, no_op, normalize_text,
                    unit_norm_rows)
 
 
