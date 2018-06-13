@@ -1,4 +1,4 @@
-from ape.ape import Ape
+from nk_ape.nk_ape import Ape
 
 __version__ = '1.0.0'
 
