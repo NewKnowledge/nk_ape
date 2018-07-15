@@ -1,14 +1,17 @@
-from gensim.models import Word2Vec
-from nk_ape.utils import mean_of_rows, no_op
 import numpy as np
+from gensim.models import Word2Vec
+
+from .config import EMBEDDING_PATH
+from .utils import mean_of_rows, no_op
 
 
 class Embedding:
     ''' Load a word2vec embedding from a file '''
+
     def __init__(self,
-                 embedding_path='embeddings/wiki2vec.model',
+                 embedding_path=EMBEDDING_PATH,
                  embed_agg_func=mean_of_rows,
-                 verbose=False):
+                 verbose=True):
 
         self.vprint = print if verbose else no_op
         self.embed_agg_func = embed_agg_func

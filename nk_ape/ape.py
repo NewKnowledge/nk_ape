@@ -1,28 +1,30 @@
 import sys
 import time
-import numpy as np
 from operator import itemgetter
+
+import numpy as np
 from inflection import pluralize
 
-from nk_ape.class_tree import EmbeddedClassTree, tree_score
-from nk_ape.embedding import Embedding
-from nk_ape.utils import (get_dropped, mean_of_rows, no_op, normalize_text,
-                   unit_norm_rows)
+from .class_tree import EmbeddedClassTree, tree_score
+from .config import EMBEDDING_PATH, ONTOLOGY_PATH
+from .embedding import Embedding
+from .utils import mean_of_rows, no_op, normalize_text, unit_norm_rows
 
 
 class EmbeddedConcepts:
 
-    def __init__(self, embedding_model, concepts,
-                 max_num_samples=1e5, embed_concepts=True, verbose=False):
-        self.max_num_samples = max_num_samples
-
-        self.vprint = print if verbose else no_op
+    def __init__(self, embedding_model, concepts, max_num_samples=1e5, embed_concepts=True, verbose=False):
 
         assert isinstance(embedding_model, Embedding)
         self.embedding = embedding_model
+        self.concepts = concepts
 
+        self.max_num_samples = max_num_samples
+        self.vprint = print if verbose else no_op
+
+        # TODO why would we not always embed the concepts?
         if embed_concepts:
-            self.embed_concepts(concepts)
+            self.concept_vectors = self.embed_concepts(concepts)
 
     def format_concepts(self, concepts):
         # list of lists of single words
@@ -37,20 +39,16 @@ class EmbeddedConcepts:
         # compute data embedding for the target concepts
         self.vprint('computing word embedding')
         try:
-            if self.max_num_samples and \
-                    len(concept_targets) > self.max_num_samples:
-                self.vprint(
-                    'subsampling rows from length {0} to {1}'
-                    .format(len(concept_targets), self.max_num_samples))
+            if self.max_num_samples and len(concept_targets) > self.max_num_samples:
+                self.vprint(f'subsampling rows from length {len(concept_targets)} to {self.max_num_samples}')
                 np.random.shuffle(concept_targets)  # TODO minibatches?
                 concept_targets = concept_targets[:self.max_num_samples]
 
             # matrix of w/ len(concept_targets) rows and n_emb_dim columns
-            dat_vecs = np.array(
-                [self.embedding.embed_multi_words(words)
-                    for words in concept_targets])
-            self.concept_vectors = unit_norm_rows(dat_vecs)
-        except:
+            dat_vecs = np.array([self.embedding.embed_multi_words(words) for words in concept_targets])
+            return unit_norm_rows(dat_vecs)
+        except Exception as err:
+            print('error during embedding:', err)
             print(sys.exc_info())
 
 
@@ -58,8 +56,8 @@ class ConceptDescriptor:
 
     def __init__(self,
                  concepts,
-                 tree='ontologies/class-tree_dbpedia_2016-10.json',
-                 embedding='models/wiki2vec/en.model',
+                 tree=ONTOLOGY_PATH,
+                 embedding=EMBEDDING_PATH,
                  row_agg_func=mean_of_rows,
                  tree_agg_func=np.mean,
                  max_num_samples=1e6,
@@ -73,9 +71,10 @@ class ConceptDescriptor:
         # load embeddings, concept vecs, and KB
         self.embedding = embedding if isinstance(embedding, Embedding) else \
             Embedding(embedding_path=embedding, verbose=verbose)
+
         self.concepts = concepts if isinstance(concepts, EmbeddedConcepts) \
-            else EmbeddedConcepts(self.embedding, concepts, max_num_samples,
-                                  verbose=verbose)
+            else EmbeddedConcepts(self.embedding, concepts, max_num_samples, verbose=verbose)
+
         self.tree = tree if isinstance(tree, EmbeddedClassTree) else \
             EmbeddedClassTree(self.embedding, tree_path=tree, verbose=verbose)
 
@@ -113,10 +112,8 @@ class ConceptDescriptor:
     def get_concept_description(self):
         final_scores = self.get_concept_class_scores()
         top_word = self.tree.classes[np.argmax(final_scores)]
-        description = (
-            'These concepts can be summarized as {0}.'
-            .format(pluralize(top_word)))
-        self.vprint('\n\n concept set description:', description, '\n\n')
+        description = f'These concepts can be summarized as {pluralize(top_word)}'
+        self.vprint('\n\nconcept set description:', description, '\n\n')
 
         return(description)
 
@@ -132,8 +129,7 @@ class ConceptDescriptor:
 
     def aggregate_tree_scores(self, scores):
         # convert score to dict that maps class to score if needed
-        score_map = (scores if isinstance(scores, dict) else
-                     dict(zip(self.tree.classes, scores)))
+        score_map = (scores if isinstance(scores, dict) else dict(zip(self.tree.classes, scores)))
 
         # aggregate score over tree structure
         agg_score_map = tree_score(score_map, self.tree, self.tree_agg_func)
@@ -148,23 +144,22 @@ class Ape:
         concepts as JSON output
     '''
 
-    def __init__(self, embedding_path):
-        self.tree = 'ontologies/class-tree_dbpedia_2016-10.json'
+    def __init__(self, ontology_path=ONTOLOGY_PATH, embedding_path=EMBEDDING_PATH, row_agg_func=mean_of_rows, tree_agg_func=np.mean, source_agg_func=mean_of_rows, max_num_samples=int(1e6), verbose=True):
+        self.tree = ontology_path
         self.embedding = embedding_path
-        self.row_agg_func = mean_of_rows
-        self.tree_agg_func = np.mean
-        self.source_agg_func = mean_of_rows
-        self.max_num_samples = 1e6
-        self.n_words = 10
-        self.verbose = True
+        self.row_agg_func = row_agg_func
+        self.tree_agg_func = tree_agg_func
+        self.source_agg_func = source_agg_func
+        self.max_num_samples = max_num_samples
+        self.verbose = verbose
 
-    def predict_labels(self, concept_string):
+    def predict_labels(self, concept_string, n_words=10):
 
         if not isinstance(concept_string, (list, tuple)):
-            concept_string = concept_string.split(' ')
+            concept_string = concept_string.split(',')
 
         start = time.time()
-
+        # TODO, do we need to create a concept descriptor for each predict_labels call?
         ape = ConceptDescriptor(
             concepts=concept_string,
             tree=self.tree,
@@ -178,11 +173,11 @@ class Ape:
             "Ape took %f seconds to execute"
             % (time.time()-start))
 
-        return ape.get_top_n_words(self.n_words)
+        return ape.get_top_n_words(n_words)
 
 
 if __name__ == '__main__':
-    client = Ape(embedding_path='/Users/ghonk/nk_projects/ape/embeddings/wiki2vec/en.model')
+    client = Ape()
     test_concepts = ['gorilla', 'chimp', 'orangutan', 'gibbon', 'human']
     result = client.predict_labels(test_concepts)
     print(result)
