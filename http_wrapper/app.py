@@ -25,6 +25,7 @@ def homepage():
 @app.route('/concepts/<input_words>')
 def req_predictions(input_words):
     result = get_predictions(input_words)
+    print('ape result:', result)
     return jsonify(result)
 
 
