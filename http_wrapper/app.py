@@ -14,6 +14,7 @@ app = Flask(__name__)
 app.json_encoder = PandasEncoder
 
 ape_client = Ape(verbose=(FLASK_ENV == 'development'))
+app.logger.info('success loading ape')
 
 
 @app.route('/')

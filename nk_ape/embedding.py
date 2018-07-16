@@ -21,7 +21,8 @@ class Embedding:
             binary = '.bin' in embedding_path
             model = KeyedVectors.load_word2vec_format(embedding_path, binary=binary)
         except UnicodeDecodeError as err:
-            self.vprint('error loading model, trying different load function', err)
+            self.vprint('error loading model:', err)
+            self.vprint('trying different load function')
             model = KeyedVectors.load(embedding_path)
         # we only use the embedding vectors (no training), so we can get rid of the rest of the model
         self.model = model.wv
