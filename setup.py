@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(name='nk_ape',
       version='1.0.0',
-      description='Abstractive Prediction via (Concept) Embedding system.',
+      description='Abstractive Prediction via Embeddings',
       packages=['nk_ape'],
       install_requires=[
       ],
