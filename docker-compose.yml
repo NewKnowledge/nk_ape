@@ -13,13 +13,12 @@ services:
       - FLASK_ENV=development
       - EMBEDDING_PATH=nk_ape/embeddings/GoogleNews-vectors-negative300.bin.gz
       # - EMBEDDING_PATH=nk_ape/embeddings/lexvec.enwiki+newscrawl.300d.W.pos.vectors
-    # env_file:
-    #   - ape.env
+      # - EMBEDDING_PATH=nk_ape/embeddings/wiki2vec/en.model
     networks:
       - backend
     ports:
       - 5000:5000
     volumes:
-      - .:/app
-      - ./nk_ape/embeddings/wiki2vec:/app/nk_ape/embeddings/wiki2vec
+      - ./nk_ape/embeddings:/app/nk_ape/embeddings
+      # - .:/app
 
