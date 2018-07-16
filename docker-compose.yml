@@ -11,9 +11,9 @@ services:
     # command: ["pytest", "--color=yes", "-s", "http_wrapper/tests.py"]
     environment:
       - FLASK_ENV=development
-      - EMBEDDING_PATH=nk_ape/embeddings/GoogleNews-vectors-negative300.bin.gz
+      # - EMBEDDING_PATH=nk_ape/embeddings/GoogleNews-vectors-negative300.bin.gz
       # - EMBEDDING_PATH=nk_ape/embeddings/lexvec.enwiki+newscrawl.300d.W.pos.vectors
-      # - EMBEDDING_PATH=nk_ape/embeddings/wiki2vec/en.model
+      - EMBEDDING_PATH=nk_ape/embeddings/wiki2vec/en.model
     networks:
       - backend
     ports:
