@@ -1,16 +1,19 @@
 ''' Flask app for ape '''
 
+import os
+
 import markdown
 from flask import Flask, Markup, jsonify, render_template, request
+from nk_ape import Ape
 
 from http_utils import PandasEncoder
-from nk_ape import Ape
+
+FLASK_ENV = os.getenv('FLASK_ENV', 'development')
 
 app = Flask(__name__)
 app.json_encoder = PandasEncoder
 
-ape_client = Ape()
-print('ape loaded')
+ape_client = Ape(verbose=(FLASK_ENV == 'development'))
 
 
 @app.route('/')
@@ -22,17 +25,14 @@ def homepage():
     return render_template('index.html', content=content)
 
 
-@app.route('/concepts/<input_words>')
+@app.route('/classes/<input_words>')
 def req_predictions(input_words):
-    result = get_predictions(input_words)
-    print('ape result:', result)
+    n_classes = int(request.args.get('n_classes', 10))
+    separator = request.args.get('separator', ',')
+    input_words = input_words.split(separator)
+
+    result = ape_client.get_top_classes(input_words, n_classes=n_classes)
     return jsonify(result)
-
-
-def get_predictions(input_words):
-    if isinstance(input_words, str):
-        input_words = input_words.split(',')
-    return ape_client.predict_labels(input_words)
 
 
 if __name__ == "__main__":

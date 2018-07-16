@@ -1,5 +1,4 @@
 import json
-import os
 
 import numpy as np
 import ontospy
@@ -23,9 +22,10 @@ class EmbeddedClassTree():
 
         self.vprint('loading ontology tree')
         self.tree = self.load_tree(tree_path)
-        self.classes = list(self.tree.keys())
+        self.classes = np.array(list(self.tree.keys()))
 
         if embed_classes:
+            # TODO why would we not want to embed classes?
             self.embed_classes()
 
     def embed_classes(self, classes=None):
@@ -55,13 +55,11 @@ class EmbeddedClassTree():
         return self.normalize_class_tree(tree)
 
 
-''' ontology utility functions:
-'''
+''' ontology utility functions: '''
 
 
 def get_leaves(tree):
-    return {name: rels for (name, rels) in tree.items()
-            if not rels.get('children')}
+    return {name: rels for (name, rels) in tree.items() if not rels.get('children')}
 
 
 def tree_score(score_map, tree, agg_func):
@@ -133,8 +131,7 @@ def has_relations(class_relations):
 
 
 def get_tree_file_name(ontology_name, prune=True):
-    return 'class-tree_{0}{1}.json'.format(
-        ontology_name, '_pruned' if prune else '')
+    return f'class-tree_{ontology_name}{"_pruned" if prune else ""}.json'
 
 
 def generate_class_tree_file(ontology_path='ontologies/dbpedia_2016-10.nt', prune=False):

@@ -11,173 +11,77 @@ from .embedding import Embedding
 from .utils import mean_of_rows, no_op, normalize_text, unit_norm_rows
 
 
-class EmbeddedConcepts:
-
-    def __init__(self, embedding_model, concepts, max_num_samples=1e5, embed_concepts=True, verbose=False):
-
-        assert isinstance(embedding_model, Embedding)
-        self.embedding = embedding_model
-        self.concepts = concepts
-
-        self.max_num_samples = max_num_samples
-        self.vprint = print if verbose else no_op
-
-        # TODO why would we not always embed the concepts?
-        if embed_concepts:
-            self.concept_vectors = self.embed_concepts(concepts)
-
-    def format_concepts(self, concepts):
-        # list of lists of single words
-        word_groups = np.array([normalize_text(text) for text in concepts])
-        return self.embedding.remove_out_of_vocab(word_groups)
-
-    def embed_concepts(self, concepts=None):
-        self.vprint('embedding concepts')
-
-        concept_targets = concepts if concepts else self.concepts
-        concept_targets = self.format_concepts(concept_targets)
-        # compute data embedding for the target concepts
-        self.vprint('computing word embedding')
-        try:
-            if self.max_num_samples and len(concept_targets) > self.max_num_samples:
-                self.vprint(f'subsampling rows from length {len(concept_targets)} to {self.max_num_samples}')
-                np.random.shuffle(concept_targets)  # TODO minibatches?
-                concept_targets = concept_targets[:self.max_num_samples]
-
-            # matrix of w/ len(concept_targets) rows and n_emb_dim columns
-            dat_vecs = np.array([self.embedding.embed_multi_words(words) for words in concept_targets])
-            return unit_norm_rows(dat_vecs)
-        except Exception as err:
-            print('error during embedding:', err)
-            print(sys.exc_info())
-
-
-class ConceptDescriptor:
+class Ape:
 
     def __init__(self,
-                 concepts,
-                 tree=ONTOLOGY_PATH,
-                 embedding=EMBEDDING_PATH,
+                 embedding_path=EMBEDDING_PATH,
+                 ontology_path=ONTOLOGY_PATH,
                  row_agg_func=mean_of_rows,
                  tree_agg_func=np.mean,
-                 max_num_samples=1e6,
-                 verbose=False
-                 ):
+                 verbose=False):
 
-        # print function that works only when verbose is true
         self.vprint = print if verbose else no_op
-        self.max_num_samples = max_num_samples
 
-        # load embeddings, concept vecs, and KB
-        self.embedding = embedding if isinstance(embedding, Embedding) else \
-            Embedding(embedding_path=embedding, verbose=verbose)
-
-        self.concepts = concepts if isinstance(concepts, EmbeddedConcepts) \
-            else EmbeddedConcepts(self.embedding, concepts, max_num_samples, verbose=verbose)
-
-        self.tree = tree if isinstance(tree, EmbeddedClassTree) else \
-            EmbeddedClassTree(self.embedding, tree_path=tree, verbose=verbose)
+        self.vprint('initializing ape')
+        self.embedding = Embedding(embedding_path=embedding_path, verbose=verbose)
+        self.tree = EmbeddedClassTree(self.embedding, tree_path=ontology_path, verbose=verbose)
 
         self.row_agg_func = row_agg_func
         self.tree_agg_func = tree_agg_func
 
-        self.similarity_matrix = {}
+        self.vprint('ape initialized')
 
     @property
     def classes(self):
         return self.tree.classes
 
-    def compute_similarity_matrix(self):
+    def format_input(self, input_text):
+        '''' format into list of lists of single words, removing words outside the word embedding vocab '''
+        self.vprint('normalizing input text and removing out-of-vocab words')
+        word_groups = np.array([normalize_text(text) for text in input_text])
+        return self.embedding.remove_out_of_vocab(word_groups)
 
-        class_matrix = self.tree.class_vectors.T
-
-        # compute cosine similarity bt embedded data and ontology classes
-        self.vprint('computing class similarity for target concepts')
-
-        sim_mat = np.dot(self.concepts.concept_vectors, class_matrix)
-        self.similarity_matrix = sim_mat
-
-    def get_concept_class_scores(self):
-
-        if not self.similarity_matrix:
-            self.vprint('computing similarity matrix')
-            self.compute_similarity_matrix()
-
-        self.vprint('aggregating row scores')
-        sim_scores = self.row_agg_func(self.similarity_matrix)
-
-        self.vprint('aggregating tree scores')
-        return self.aggregate_tree_scores(sim_scores)  # same
-
-    def get_concept_description(self):
-        final_scores = self.get_concept_class_scores()
-        top_word = self.tree.classes[np.argmax(final_scores)]
-        description = f'These concepts can be summarized as {pluralize(top_word)}'
-        self.vprint('\n\nconcept set description:', description, '\n\n')
-
-        return(description)
-
-    def get_top_n_words(self, n):
-        final_scores = self.get_concept_class_scores()
-        indexed_scores = zip(final_scores, range(len(final_scores)))
-        indexed_scores = sorted(
-            indexed_scores, key=itemgetter(0), reverse=True)
-        top_n = indexed_scores[0:n]
-        top_words = [{'concept': self.tree.classes[index], 'conf': score} for (score, index) in top_n]
-
-        return top_words
+    def compute_similarity_matrix(self, input_vectors):
+        ''' compute cosine similarity bt embedded data and ontology classes '''
+        self.vprint('computing similarity matrix between class and input vectors')
+        return np.dot(input_vectors, self.tree.class_vectors.T)
 
     def aggregate_tree_scores(self, scores):
         # convert score to dict that maps class to score if needed
-        score_map = (scores if isinstance(scores, dict) else dict(zip(self.tree.classes, scores)))
+        score_map = (scores if isinstance(scores, dict) else dict(zip(self.classes, scores)))
 
         # aggregate score over tree structure
         agg_score_map = tree_score(score_map, self.tree, self.tree_agg_func)
 
-        # convert returned score map back to array
-        return np.array([agg_score_map[cl] for cl in self.tree.classes])
+        # convert returned score map back to array, make float64 to be json-serializable (for some reason float32 is not)
+        return np.array([agg_score_map[cl] for cl in self.classes], dtype=np.float64)
 
+    def get_class_scores(self, input_text):
 
-class Ape:
-    ''' ApeListener takes a string of space-separated concepts
-        and produces a set of related and (possibly) more abstract
-        concepts as JSON output
-    '''
+        # clean/format text, embed input to get input_vectors
+        input_text = self.format_input(input_text)
+        input_vectors = np.array([self.embedding.embed_multi_words(words) for words in input_text])
+        input_vectors = unit_norm_rows(input_vectors)
 
-    def __init__(self, ontology_path=ONTOLOGY_PATH, embedding_path=EMBEDDING_PATH, row_agg_func=mean_of_rows, tree_agg_func=np.mean, source_agg_func=mean_of_rows, max_num_samples=int(1e6), verbose=True):
-        self.tree = ontology_path
-        self.embedding = embedding_path
-        self.row_agg_func = row_agg_func
-        self.tree_agg_func = tree_agg_func
-        self.source_agg_func = source_agg_func
-        self.max_num_samples = max_num_samples
-        self.verbose = verbose
+        sim_matrix = self.compute_similarity_matrix(input_vectors)
 
-    def predict_labels(self, concept_string, n_words=10):
+        self.vprint('aggregating row scores')
+        sim_scores = self.row_agg_func(sim_matrix)
 
-        if not isinstance(concept_string, (list, tuple)):
-            concept_string = concept_string.split(',')
+        self.vprint('aggregating tree scores')
+        return self.aggregate_tree_scores(sim_scores)
 
-        start = time.time()
-        # TODO, do we need to create a concept descriptor for each predict_labels call?
-        ape = ConceptDescriptor(
-            concepts=concept_string,
-            tree=self.tree,
-            embedding=self.embedding,
-            row_agg_func=self.row_agg_func,
-            tree_agg_func=self.tree_agg_func,
-            max_num_samples=self.max_num_samples,
-            verbose=self.verbose)
+    def get_top_classes(self, input_text, n_classes=10):
+        # TODO add max length of input text?
+        scores = self.get_class_scores(input_text)
+        sort_inds = np.argsort(scores)[::-1][:n_classes]
+        top_classes = self.classes[sort_inds]
+        top_scores = scores[sort_inds]
 
-        print(
-            "Ape took %f seconds to execute"
-            % (time.time()-start))
+        return [{'class': ont_class, 'score': score} for ont_class, score in zip(top_classes, top_scores)]
 
-        return ape.get_top_n_words(n_words)
-
-
-if __name__ == '__main__':
-    client = Ape()
-    test_concepts = ['gorilla', 'chimp', 'orangutan', 'gibbon', 'human']
-    result = client.predict_labels(test_concepts)
-    print(result)
+    def get_description(self, input_text):
+        scores = self.get_class_scores(input_text)
+        top_word = self.classes[np.argmax(scores)]
+        self.vprint('\n\nselecting top word as description:', top_word, '\n\n')
+        return f'The given text can be summarized as {pluralize(top_word)}'

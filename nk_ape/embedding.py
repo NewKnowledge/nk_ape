@@ -1,5 +1,5 @@
 import numpy as np
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, KeyedVectors
 
 from .config import EMBEDDING_PATH
 from .utils import mean_of_rows, no_op
@@ -11,13 +11,21 @@ class Embedding:
     def __init__(self,
                  embedding_path=EMBEDDING_PATH,
                  embed_agg_func=mean_of_rows,
-                 verbose=True):
+                 verbose=False):
 
         self.vprint = print if verbose else no_op
         self.embed_agg_func = embed_agg_func
 
         self.vprint('loading word2vec embedding model')
-        self.model = Word2Vec.load(embedding_path)
+        try:
+            binary = '.bin' in embedding_path
+            model = KeyedVectors.load_word2vec_format(embedding_path, binary=binary)
+        except UnicodeDecodeError as err:
+            self.vprint('error loading model, trying different load function', err)
+            model = KeyedVectors.load(embedding_path)
+        # we only use the embedding vectors (no training), so we can get rid of the rest of the model
+        self.model = model.wv
+        del model
 
     def remove_out_of_vocab(self, word_groups):
         if isinstance(word_groups, str):
@@ -34,12 +42,12 @@ class Embedding:
         return word_groups[in_vocab]
 
     def embed_multi_words(self, word_list):
-        return self.embed_agg_func([self.model.wv[word] for word in word_list])
+        return self.embed_agg_func([self.model[word] for word in word_list])
 
     def n_similarity(self, words, classes):
-        return self.model.wv.n_similarity(words, classes)
+        return self.model.n_similarity(words, classes)
 
     def in_vocab(self, word_list):
         if isinstance(word_list, str):
             word_list = word_list.split(' ')
-        return all([word in self.model.wv.vocab for word in word_list])
+        return all([word in self.model.vocab for word in word_list])

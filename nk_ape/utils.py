@@ -14,7 +14,7 @@ def normalize_text(
         replace_chars={
             '_': ' ', '-': ' ', '(': '', ')': '',
             '.': '',  ',': '',  '!': '', '?': ''
-            }):
+        }):
     text = underscore(text)  # converts to snake_case
     for old, new in replace_chars.items():
         text = text.replace(old, new)
@@ -39,11 +39,11 @@ def max_of_rows(vectors):
 def in_vocab(word_list, model):
     if isinstance(word_list, str):
         word_list = word_list.split(' ')
-    return all([word in model.wv.vocab for word in word_list])
+    return all([word in model.vocab for word in word_list])
 
 
 def get_dropped(old, new):
-        return set(old).difference(set(new))
+    return set(old).difference(set(new))
 
 
 def no_op():
