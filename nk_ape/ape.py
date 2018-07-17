@@ -60,6 +60,8 @@ class Ape:
 
         # clean/format text, embed input to get input_vectors
         input_text = self.format_input(input_text)
+        # TODO check for multi-word text here (then use embedding.embed_multi_words or embed_word)
+        # input_vectors = np.array([self.embedding.embed_word(word) for word in input_text])
         input_vectors = np.array([self.embedding.embed_multi_words(words) for words in input_text])
         input_vectors = unit_norm_rows(input_vectors)
 

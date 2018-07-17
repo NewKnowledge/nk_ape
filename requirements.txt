@@ -5,3 +5,4 @@ inflection
 ontospy
 flask
 pytest
+kafka

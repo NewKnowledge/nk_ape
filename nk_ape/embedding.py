@@ -42,6 +42,9 @@ class Embedding:
             .format(len(word_groups) - sum(in_vocab), len(word_groups)))
         return word_groups[in_vocab]
 
+    def embed_word(self, word):
+        return self.model[word]
+
     def embed_multi_words(self, word_list):
         return self.embed_agg_func([self.model[word] for word in word_list])
 

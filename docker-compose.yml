@@ -5,20 +5,64 @@ networks:
 
 services:
 
-  ape:
+  ape-consumer:
     build: .
-    command: ["flask", "run", "--host=0.0.0.0"]
+    depends_on:
+      - social-db
+      - kafka
+    command: python kafka_wrapper/consumer.py
+    # command: ["flask", "run", "--host=0.0.0.0"]
     # command: ["pytest", "--color=yes", "-s", "http_wrapper/tests.py"]
     environment:
       - FLASK_ENV=development
-      # - EMBEDDING_PATH=nk_ape/embeddings/GoogleNews-vectors-negative300.bin.gz
-      # - EMBEDDING_PATH=nk_ape/embeddings/lexvec.enwiki+newscrawl.300d.W.pos.vectors
-      - EMBEDDING_PATH=nk_ape/embeddings/wiki2vec/en.model
+      - EMBEDDING_PATH=nk_ape/embeddings/GoogleNews-vectors-negative300.bin.gz
+      - EMBEDDING_PATH=nk_ape/embeddings/lexvec.enwiki+newscrawl.300d.W.pos.vectors
+      # - EMBEDDING_PATH=nk_ape/embeddings/wiki2vec/en.model
     networks:
       - backend
     ports:
       - 5000:5000
     volumes:
       - ./nk_ape/embeddings:/app/nk_ape/embeddings
-      # - .:/app
+      - .:/app
+    # env_file:
+    #   - ape-consumer.env
 
+  social-db:
+    image: newknowledge.azurecr.io/ds/social-db-dev:seed-dev
+    networks:
+      - backend
+    # env_file:
+    #   - ape-consumer.env
+
+  zookeeper:
+    image: zookeeper:3.4.9
+    restart: unless-stopped
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888
+    networks:
+      - backend
+    ports:
+      - 2181:2181
+
+  kafka:
+    image: confluentinc/cp-kafka:4.0.0
+    environment:
+      # add the entry "127.0.0.1    kafka" to your /etc/hosts file
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /vols/kafka-data/data
+
+    depends_on:
+      - zookeeper
+    networks:
+      - backend
+    ports:
+      - 9092:9092
