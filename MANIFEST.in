@@ -1,0 +1,2 @@
+include nk_ape/ontologies/class-tree_dbpedia_2016-10.json
+include nk_ape/ontologies/class-tree_dbpedia_2016-10_pruned.json
