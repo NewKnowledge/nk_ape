@@ -60,6 +60,8 @@ class Ape:
 
         # clean/format text, embed input to get input_vectors
         input_text = self.format_input(input_text)
+        # TODO check for multi-word text here (then use embedding.embed_multi_words or embed_word)
+        # input_vectors = np.array([self.embedding.embed_word(word) for word in input_text])
         input_vectors = np.array([self.embedding.embed_multi_words(words) for words in input_text])
         input_vectors = unit_norm_rows(input_vectors)
 
@@ -72,7 +74,8 @@ class Ape:
         return self.aggregate_tree_scores(sim_scores)
 
     def get_top_classes(self, input_text, n_classes=10):
-        # TODO add max length of input text?
+        # TODO control max length of input text?
+        # TODO set score threshold instead of always top n classes?
         scores = self.get_class_scores(input_text)
         sort_inds = np.argsort(scores)[::-1][:n_classes]
         top_classes = self.classes[sort_inds]

@@ -21,7 +21,8 @@ class Embedding:
             binary = '.bin' in embedding_path
             model = KeyedVectors.load_word2vec_format(embedding_path, binary=binary)
         except UnicodeDecodeError as err:
-            self.vprint('error loading model, trying different load function', err)
+            self.vprint('error loading model:', err)
+            self.vprint('trying different load function')
             model = KeyedVectors.load(embedding_path)
         # we only use the embedding vectors (no training), so we can get rid of the rest of the model
         self.model = model.wv
@@ -40,6 +41,9 @@ class Embedding:
             'dropping {0} out of {1} values for having out-of-vocab words'
             .format(len(word_groups) - sum(in_vocab), len(word_groups)))
         return word_groups[in_vocab]
+
+    def embed_word(self, word):
+        return self.model[word]
 
     def embed_multi_words(self, word_list):
         return self.embed_agg_func([self.model[word] for word in word_list])

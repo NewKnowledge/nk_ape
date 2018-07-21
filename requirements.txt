@@ -5,3 +5,7 @@ inflection
 ontospy
 flask
 pytest
+kafka
+sqlalchemy
+psycopg2-binary
+retrying
