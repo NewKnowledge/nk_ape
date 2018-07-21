@@ -74,7 +74,8 @@ class Ape:
         return self.aggregate_tree_scores(sim_scores)
 
     def get_top_classes(self, input_text, n_classes=10):
-        # TODO add max length of input text?
+        # TODO control max length of input text?
+        # TODO set score threshold instead of always top n classes?
         scores = self.get_class_scores(input_text)
         sort_inds = np.argsort(scores)[::-1][:n_classes]
         top_classes = self.classes[sort_inds]

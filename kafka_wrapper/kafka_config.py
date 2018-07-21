@@ -1,6 +1,6 @@
 import os
 
-KAFKA_TOPIC = os.getenv('KAFKA_TOPIC', 'posts')
+KAFKA_TOPIC = os.getenv('KAFKA_TOPIC', 'dev.web.data.collectposts')
 KAFKA_BROKERS = os.getenv('KAFKA_BROKERS', 'kafka:9092')
 
 SOCIAL_DB_HOST = os.getenv('SOCIAL_DB_HOST', 'social-db')
